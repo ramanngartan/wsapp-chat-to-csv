@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preview & Export - WhatsApp Chat to CSV</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <button id="themeToggle" class="theme-toggle">☀️</button>
+  
+  <main class="card">
+    <h1>Chat Preview & Export</h1>
+    
+    <!-- Statistics -->
+    <section id="statsSection" class="stats-section">
+      <h2>Statistics</h2>
+      <div class="stats-grid" id="statsGrid"></div>
+    </section>
+
+    <!-- Filters -->
+    <section class="filters-section">
+      <h2>Filters</h2>
+      <div class="filters-grid">
+        <div>
+          <label>Sender:</label>
+          <select id="senderFilter">
+            <option value="all">All Senders</option>
+          </select>
+        </div>
+        <div>
+          <label>Date From:</label>
+          <input type="date" id="dateFrom" />
+        </div>
+        <div>
+          <label>Date To:</label>
+          <input type="date" id="dateTo" />
+        </div>
+        <div>
+          <label>Keyword:</label>
+          <input type="text" id="keywordFilter" placeholder="Search in messages..." />
+        </div>
+      </div>
+      <button id="applyFilters" class="btn-secondary">Apply Filters</button>
+      <button id="clearFilters" class="btn-link">Clear</button>
+    </section>
+
+    <!-- Export Options -->
+    <section class="export-section">
+      <h2>Export Options</h2>
+      <div class="export-options">
+        <div>
+          <label>Format:</label>
+          <select id="exportFormat">
+            <option value="csv">CSV</option>
+            <option value="json">JSON</option>
+            <option value="excel">Excel (.xlsx)</option>
+            <option value="html">HTML</option>
+          </select>
+        </div>
+        <div>
+          <label>Delimiter (CSV only):</label>
+          <select id="csvDelimiter">
+            <option value=",">Comma (,)</option>
+            <option value=";">Semicolon (;)</option>
+            <option value="\t">Tab</option>
+          </select>
+        </div>
+        <div>
+          <label>Columns:</label>
+          <div class="columns-checkboxes" id="columnsCheckboxes"></div>
+        </div>
+      </div>
+      <button id="exportBtn" class="btn">Export</button>
+    </section>
+
+    <!-- Preview Table -->
+    <section class="preview-section">
+      <h2>Preview (First 20 Messages)</h2>
+      <div class="table-container">
+        <table id="previewTable">
+          <thead id="previewHead"></thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+      <p class="note" id="previewNote"></p>
+    </section>
+
+    <a class="link" href="/">Convert another file</a>
+  </main>
+
+  <script src="preview.js"></script>
+</body>
+</html>
+
