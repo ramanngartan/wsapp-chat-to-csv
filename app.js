@@ -44,38 +44,92 @@ function toCsv(rows) {
 }
 
 function parseWhatsAppTxt(text) {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  const rows = [];
-
-  const bracketRe =
-    /^\[(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?)\s*,\s*(\d{4}-\d{2}-\d{2})\]\s*(.*)$/i;
-
-  const dashRe =
-    /^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}),\s*(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?)\s*-\s*(.*)$/i;
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    let m = line.match(bracketRe) || line.match(dashRe);
-
-    if (m) {
-      const date = m[2] || m[1];
-      const time = m[1];
-      const rest = m[m.length - 1];
-
-      const idx = rest.indexOf(":");
-      const sender = idx !== -1 ? rest.slice(0, idx).trim() : "";
-      const message = idx !== -1 ? rest.slice(idx + 1).trim() : rest.trim();
-
-      rows.push({ date, time, sender, message });
-    } else if (rows.length) {
-      rows[rows.length - 1].message += "\n" + line;
+    const lines = text.replace(/\r\n/g, "\n").split("\n");
+    const rows = [];
+  
+    // Removes common invisible marks WhatsApp inserts (LTR/RTL marks, BOM),
+    // and normalizes narrow no-break spaces to regular spaces.
+    function normalizeLine(s) {
+      return s
+        .replace(/\u202F/g, " ") // narrow no-break space (often between seconds and PM)
+        .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "") // direction/BOM
+        .trimEnd();
     }
-  }
-
-  return rows;
+  
+    // Format A (your current):
+    // [11:10 p.m., 2025-11-16] Name: Message
+    const bracketTimeDateRe =
+      /^\[(\d{1,2}:\d{2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?)\s*,\s*(\d{4}-\d{2}-\d{2})\]\s*(.*)$/i;
+  
+    // Format B (the one you want):
+    // [2023-07-07, 10:00:20 PM] Name: Message
+    const bracketDateTimeRe =
+      /^\[(\d{4}-\d{2}-\d{2})\s*,\s*(\d{1,2}:\d{2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?)\]\s*(.*)$/i;
+  
+    // Legacy WhatsApp format:
+    // 12/03/24, 9:41 pm - Name: Message
+    const dashRe =
+      /^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}),\s*(\d{1,2}:\d{2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?)\s*-\s*(.*)$/i;
+  
+    for (let raw of lines) {
+      if (!raw.trim()) continue;
+  
+      const line = normalizeLine(raw);
+  
+      let date = "";
+      let time = "";
+      let rest = "";
+  
+      let m = line.match(bracketTimeDateRe);
+      if (m) {
+        time = m[1].trim();
+        date = m[2].trim();
+        rest = m[3];
+      } else {
+        m = line.match(bracketDateTimeRe);
+        if (m) {
+          date = m[1].trim();
+          time = m[2].trim();
+          rest = m[3];
+        } else {
+          m = line.match(dashRe);
+          if (m) {
+            date = m[1].trim();
+            time = m[2].trim();
+            rest = m[3];
+          }
+        }
+      }
+  
+      if (m) {
+        // Split "Sender: Message" (message can be empty)
+        const idx = rest.indexOf(":");
+        let sender = "";
+        let message = rest;
+  
+        if (idx !== -1) {
+          sender = rest.slice(0, idx).trim();
+          message = rest.slice(idx + 1).trimStart();
+        } else {
+          // system line with no explicit sender
+          sender = "";
+          message = rest.trim();
+        }
+  
+        rows.push({ date, time, sender, message });
+      } else {
+        // Continuation line (multiline)
+        if (rows.length > 0) {
+          rows[rows.length - 1].message += "\n" + line;
+        } else {
+          rows.push({ date: "", time: "", sender: "", message: line });
+        }
+      }
+    }
+  
+    return rows;
 }
-
+  
 /* -------------------- Routes -------------------- */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
