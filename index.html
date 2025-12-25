@@ -12,7 +12,7 @@
   <main class="card">
     <h1>WhatsApp Chat to CSV</h1>
     <p class="sub">
-      Upload a WhatsApp exported <b>.txt</b> file and download a clean <b>.csv</b>.
+      Upload a WhatsApp exported <b>.txt</b> file or <b>.zip</b> archive and download a clean <b>.csv</b>.
     </p>
 
     <!-- Upload Form -->
@@ -22,10 +22,10 @@
           id="chatFile"
           type="file"
           name="chatFile"
-          accept=".txt"
+          accept=".txt,.zip"
           required
         />
-        <span id="fileName">Choose .txt file</span>
+        <span id="fileName">Choose .txt or .zip file</span>
       </label>
 
       <button id="convertBtn" type="submit">
@@ -39,7 +39,7 @@
       <ol>
         <li>Open chat → menu → <b>More</b> → <b>Export chat</b></li>
         <li>Choose <b>Without media</b></li>
-        <li>Upload the exported <b>.txt</b> file here</li>
+        <li>Upload the exported <b>.txt</b> file or <b>.zip</b> archive here</li>
       </ol>
     </details>
   </main>

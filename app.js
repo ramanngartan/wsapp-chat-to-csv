@@ -1,6 +1,7 @@
 const express = require("express");
 const path = require("path");
 const multer = require("multer");
+const AdmZip = require("adm-zip");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -138,48 +139,96 @@ app.get("/", (req, res) => {
 app.post("/upload", upload.single("chatFile"), (req, res) => {
   if (!req.file) return res.status(400).send("No file uploaded.");
 
-  if (!req.file.originalname.endsWith(".txt")) {
-    return res.status(400).send("Please upload a .txt file.");
+  const lowerName = req.file.originalname.toLowerCase();
+  const isZip = lowerName.endsWith(".zip");
+  const isTxt = lowerName.endsWith(".txt");
+
+  if (!isZip && !isTxt) {
+    return res.status(400).send("Please upload a .txt or .zip file.");
   }
 
-  const rows = parseWhatsAppTxt(req.file.buffer.toString("utf8"));
-  if (!rows.length) {
-    return res.status(400).send("Unsupported WhatsApp format.");
+  let allRows = [];
+  let filesProcessed = 0;
+
+  try {
+    if (isZip) {
+      // Extract and process all .txt files from zip
+      const zip = new AdmZip(req.file.buffer);
+      const zipEntries = zip.getEntries();
+
+      for (const entry of zipEntries) {
+        if (entry.entryName.endsWith(".txt") && !entry.isDirectory) {
+          try {
+            const content = entry.getData().toString("utf8");
+            const rows = parseWhatsAppTxt(content);
+            if (rows.length > 0) {
+              allRows = allRows.concat(rows);
+              filesProcessed++;
+            }
+          } catch (err) {
+            // Skip files that can't be parsed
+            console.error(`Error processing ${entry.entryName}:`, err.message);
+          }
+        }
+      }
+
+      if (filesProcessed === 0) {
+        return res.status(400).send("No valid .txt files found in the zip archive.");
+      }
+    } else {
+      // Process single .txt file
+      const rows = parseWhatsAppTxt(req.file.buffer.toString("utf8"));
+      if (!rows.length) {
+        return res.status(400).send("Unsupported WhatsApp format.");
+      }
+      allRows = rows;
+      filesProcessed = 1;
+    }
+
+    if (!allRows.length) {
+      return res.status(400).send("No messages found in the file(s).");
+    }
+
+    const csv = toCsv(allRows);
+    const id = Math.random().toString(36).slice(2);
+    const baseName = req.file.originalname.replace(/\.(txt|zip)$/, "");
+    const filename =
+      baseName +
+      "-" +
+      new Date().toISOString().slice(0, 10) +
+      ".csv";
+
+    downloads.set(id, {
+      csv,
+      filename,
+      createdAt: Date.now(),
+    });
+
+    const filesText = filesProcessed > 1 ? ` from <b>${filesProcessed}</b> files` : "";
+
+    res.send(`
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <link rel="stylesheet" href="/styles.css" />
+        <title>Done</title>
+      </head>
+      <body>
+        <main class="card">
+          <h1>Done</h1>
+          <p class="sub">Parsed <b>${allRows.length}</b> messages${filesText}.</p>
+          <p class="note">File: <b>${filename}</b></p>
+          <a class="btn" href="/download/${id}">Download CSV</a>
+          <a class="link" href="/">Convert another file</a>
+        </main>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error("Upload error:", err);
+    return res.status(500).send("Error processing file: " + err.message);
   }
-
-  const csv = toCsv(rows);
-  const id = Math.random().toString(36).slice(2);
-  const filename =
-    req.file.originalname.replace(/\.txt$/, "") +
-    "-" +
-    new Date().toISOString().slice(0, 10) +
-    ".csv";
-
-  downloads.set(id, {
-    csv,
-    filename,
-    createdAt: Date.now(),
-  });
-
-  res.send(`
-    <!doctype html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <link rel="stylesheet" href="/styles.css" />
-      <title>Done</title>
-    </head>
-    <body>
-      <main class="card">
-        <h1>Done</h1>
-        <p class="sub">Parsed <b>${rows.length}</b> messages.</p>
-        <p class="note">File: <b>${filename}</b></p>
-        <a class="btn" href="/download/${id}">Download CSV</a>
-        <a class="link" href="/">Convert another file</a>
-      </main>
-    </body>
-    </html>
-  `);
 });
 
 app.get("/download/:id", (req, res) => {

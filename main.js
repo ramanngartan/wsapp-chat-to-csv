@@ -9,7 +9,7 @@ input.addEventListener("change", () => {
   fileName.textContent =
     input.files && input.files[0]
       ? input.files[0].name
-      : "Choose .txt file";
+      : "Choose .txt or .zip file";
 });
 
 // Disable button on submit

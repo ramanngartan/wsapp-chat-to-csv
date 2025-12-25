@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "express": "^4.22.1",
     "multer": "^2.0.2"
   }
