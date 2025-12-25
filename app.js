@@ -188,7 +188,32 @@ app.get("/download/:id", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
 
   if (!item) {
-    return res.sendFile(path.join(__dirname, "expired.html"));
+    return res.sendFile(
+      path.join(__dirname, "expired.html"),
+      (err) => {
+        if (err) {
+          // Fallback if file doesn't exist
+          res.status(404).send(`
+            <!doctype html>
+            <html>
+            <head>
+              <meta charset="utf-8" />
+              <link rel="stylesheet" href="/styles.css" />
+              <title>Download Expired</title>
+            </head>
+            <body>
+              <main class="card">
+                <h1>Download Expired</h1>
+                <p class="sub">This download link has expired or has already been used.</p>
+                <p class="note">Download links are valid for 10 minutes and can only be used once.</p>
+                <a class="btn" href="/">Convert another file</a>
+              </main>
+            </body>
+            </html>
+          `);
+        }
+      }
+    );
   }
 
   downloads.delete(req.params.id);
