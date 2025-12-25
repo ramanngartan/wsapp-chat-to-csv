@@ -73,3 +73,16 @@ button:disabled { opacity: 0.7; cursor: not-allowed; }
 }
 .link:hover{ text-decoration: underline; }
   
+.footer {
+    margin-top: 40px;
+    padding: 16px 12px;
+    text-align: center;
+    font-size: 13px;
+    color: #9ca3af;
+    opacity: 0.85;
+  }
+  
+.footer p {
+    margin: 0;
+}
+  
