@@ -213,7 +213,12 @@ app.get("/download/:id", (req, res) => {
     return res.send(item.csv);
 });
   
-
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+app.get("/health", (req, res) => {
+    res.status(200).send("ok");
 });
+  
+
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+});
+  
