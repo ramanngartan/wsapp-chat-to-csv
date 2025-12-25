@@ -5,31 +5,30 @@ const multer = require("multer");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve static files
+/* -------------------- Static -------------------- */
 app.use(express.static(__dirname));
 
-// Multer setup (store file in memory)
+/* -------------------- Upload -------------------- */
 const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB for MVP
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
-  
-// In-memory cache for downloads (MVP)
+
+/* -------------------- Temp Storage -------------------- */
 const downloads = new Map();
 
-// Cleanup old downloads every 10 minutes
 setInterval(() => {
   const now = Date.now();
-  for (const [key, value] of downloads.entries()) {
-    if (now - value.createdAt > 10 * 60 * 1000) downloads.delete(key);
+  for (const [id, item] of downloads.entries()) {
+    if (now - item.createdAt > 10 * 60 * 1000) {
+      downloads.delete(id);
+    }
   }
 }, 10 * 60 * 1000);
 
-
+/* -------------------- Helpers -------------------- */
 function escapeCsv(value) {
-  const s = String(value ?? "");
-  // Wrap in quotes, double any quotes inside
-  return `"${s.replace(/"/g, '""')}"`;
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
 function toCsv(rows) {
@@ -45,180 +44,119 @@ function toCsv(rows) {
 }
 
 function parseWhatsAppTxt(text) {
-    const lines = text.replace(/\r\n/g, "\n").split("\n");
-    const rows = [];
-  
-    // Supports:
-    // [11:10 p.m., 2025-11-16] Name: Message
-    // Also tolerates extra spaces and a.m./p.m. variations
-    const bracketRe =
-      /^\[(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?)\s*,\s*(\d{4}-\d{2}-\d{2})\]\s*(.*)$/i;
-  
-    // Legacy WhatsApp format (keep it, for other users):
-    // 12/03/24, 9:41 pm - Name: Message
-    const dashRe =
-      /^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}),\s*(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?)\s*-\s*(.*)$/i;
-  
-    for (const line of lines) {
-      if (!line.trim()) continue;
-  
-      let date = "";
-      let time = "";
-      let rest = "";
-  
-      let m = line.match(bracketRe);
-      if (m) {
-        time = m[1].trim();
-        date = m[2].trim();
-        rest = m[3];
-      } else {
-        m = line.match(dashRe);
-        if (m) {
-          date = m[1].trim();
-          time = m[2].trim();
-          rest = m[3];
-        }
-      }
-  
-      if (m) {
-        // Split "Sender: Message" (message can be empty)
-        const idx = rest.indexOf(":");
-        let sender = "";
-        let message = rest;
-  
-        if (idx !== -1) {
-          sender = rest.slice(0, idx).trim();
-          // allow empty message after colon
-          message = rest.slice(idx + 1).trimStart();
-          if (message.startsWith(" ")) message = message.slice(1);
-        } else {
-          // system message / no sender
-          sender = "";
-          message = rest.trim();
-        }
-  
-        rows.push({ date, time, sender, message });
-      } else {
-        // Continuation line (multiline bullets, paragraphs, etc.)
-        if (rows.length > 0) {
-          rows[rows.length - 1].message += "\n" + line;
-        } else {
-          rows.push({ date: "", time: "", sender: "", message: line });
-        }
-      }
-    }
-  
-    return rows;
-  }
-  
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const rows = [];
 
-// Home
+  const bracketRe =
+    /^\[(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?)\s*,\s*(\d{4}-\d{2}-\d{2})\]\s*(.*)$/i;
+
+  const dashRe =
+    /^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}),\s*(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?)\s*-\s*(.*)$/i;
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+
+    let m = line.match(bracketRe) || line.match(dashRe);
+
+    if (m) {
+      const date = m[2] || m[1];
+      const time = m[1];
+      const rest = m[m.length - 1];
+
+      const idx = rest.indexOf(":");
+      const sender = idx !== -1 ? rest.slice(0, idx).trim() : "";
+      const message = idx !== -1 ? rest.slice(idx + 1).trim() : rest.trim();
+
+      rows.push({ date, time, sender, message });
+    } else if (rows.length) {
+      rows[rows.length - 1].message += "\n" + line;
+    }
+  }
+
+  return rows;
+}
+
+/* -------------------- Routes -------------------- */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Upload → Convert → Download CSV
 app.post("/upload", upload.single("chatFile"), (req, res) => {
   if (!req.file) return res.status(400).send("No file uploaded.");
 
-  if (!req.file.originalname.toLowerCase().endsWith(".txt")) {
-    return res.status(400).send("Please upload a .txt WhatsApp export file.");
+  if (!req.file.originalname.endsWith(".txt")) {
+    return res.status(400).send("Please upload a .txt file.");
   }
 
-  const txt = req.file.buffer.toString("utf8");
-  const rows = parseWhatsAppTxt(txt);
+  const rows = parseWhatsAppTxt(req.file.buffer.toString("utf8"));
   if (!rows.length) {
-    return res.status(400).send("Could not detect WhatsApp message format in this file.");
+    return res.status(400).send("Unsupported WhatsApp format.");
   }
+
   const csv = toCsv(rows);
+  const id = Math.random().toString(36).slice(2);
+  const filename =
+    req.file.originalname.replace(/\.txt$/, "") +
+    "-" +
+    new Date().toISOString().slice(0, 10) +
+    ".csv";
 
-  const stamp = new Date().toISOString().slice(0, 10);
-  const baseName = (req.file.originalname || "whatsapp-chat.txt").replace(/\.txt$/i, "");
-  const outName = `${baseName}-${stamp}.csv`;
+  downloads.set(id, {
+    csv,
+    filename,
+    createdAt: Date.now(),
+  });
 
-    // Store CSV temporarily
-    const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    downloads.set(id, { csv, filename: outName, createdAt: Date.now() });
-  
-    // Show success page + auto-download once
-    return res.send(`
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>Done</title>
-          <link rel="stylesheet" href="/styles.css" />
-        </head>
-        <body>
-          <main class="card">
-            <h1>Done</h1>
-            <p class="sub">Parsed <b>${rows.length}</b> messages.</p>
-            <p class="note">File: <b>${outName}</b></p>
-  
-            <a class="btn" href="/download/${id}">Download CSV</a>
-            <a class="link" href="/">Convert another file</a>
-  
-          </main>
-        </body>
-      </html>
-    `);
-  
+  res.send(`
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <link rel="stylesheet" href="/styles.css" />
+      <title>Done</title>
+    </head>
+    <body>
+      <main class="card">
+        <h1>Done</h1>
+        <p class="sub">Parsed <b>${rows.length}</b> messages.</p>
+        <p class="note">File: <b>${filename}</b></p>
+        <a class="btn" href="/download/${id}">Download CSV</a>
+        <a class="link" href="/">Convert another file</a>
+      </main>
+    </body>
+    </html>
+  `);
 });
 
-// Friendly error handler (ex: file too large)
-app.use((err, req, res, next) => {
-    if (err && err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).send("File too large. Max 5MB for now.");
-    }
-    console.error(err);
-    return res.status(500).send("Something went wrong. Please try again.");
-});
-  
 app.get("/download/:id", (req, res) => {
-    const id = req.params.id;
-    const item = downloads.get(id);
-  
-    // Prevent browser caching (this fixes "download works twice")
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-  
-    if (!item) {
-      return res.status(404).send(`
-        <!doctype html>
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <title>Expired</title>
-            <link rel="stylesheet" href="/styles.css" />
-          </head>
-          <body>
-            <main class="card">
-              <h1>Download expired</h1>
-              <p class="sub">Please convert the file again.</p>
-              <a class="btn" href="/">Convert a file</a>
-            </main>
-          </body>
-        </html>
-      `);
-    }
-  
-    // One-time link
-    downloads.delete(id);
-  
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${item.filename}"`);
-    return res.send(item.csv);
-});
-  
-app.get("/health", (req, res) => {
-    res.status(200).send("ok");
-});
-  
+  const item = downloads.get(req.params.id);
 
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+  res.setHeader("Cache-Control", "no-store");
+
+  if (!item) {
+    return res.sendFile(path.join(__dirname, "expired.html"));
+  }
+
+  downloads.delete(req.params.id);
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${item.filename}"`
+  );
+  res.send(item.csv);
 });
-  
+
+/* -------------------- Errors -------------------- */
+app.use((err, req, res, next) => {
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).send("File too large (max 5MB).");
+  }
+  console.error(err);
+  res.status(500).send("Something went wrong.");
+});
+
+/* -------------------- Start -------------------- */
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});

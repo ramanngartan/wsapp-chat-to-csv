@@ -7,56 +7,56 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+
+  <!-- Main Card -->
   <main class="card">
     <h1>WhatsApp Chat to CSV</h1>
     <p class="sub">
       Upload a WhatsApp exported <b>.txt</b> file and download a clean <b>.csv</b>.
     </p>
 
+    <!-- Upload Form -->
     <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data">
       <label class="file">
-        <input id="chatFile" type="file" name="chatFile" accept=".txt" required />
+        <input
+          id="chatFile"
+          type="file"
+          name="chatFile"
+          accept=".txt"
+          required
+        />
         <span id="fileName">Choose .txt file</span>
       </label>
 
-      <button id="convertBtn" type="submit">Convert</button>
+      <button id="convertBtn" type="submit">
+        Convert
+      </button>
 
       <p class="note">
-        Privacy: files are processed in memory and not stored.
+        Privacy: files are processed in memory and never stored.
       </p>
     </form>
 
+    <!-- Help -->
     <details class="how">
       <summary>How to export WhatsApp chat</summary>
       <ol>
         <li>Open chat → menu → <b>More</b> → <b>Export chat</b></li>
         <li>Choose <b>Without media</b></li>
-        <li>Save the exported <b>.txt</b> file, then upload here</li>
+        <li>Upload the exported <b>.txt</b> file here</li>
       </ol>
     </details>
   </main>
 
+  <!-- Footer -->
   <footer class="footer">
     <p>
       © <span id="year"></span> WhatsApp Chat to CSV ·
       Files are processed in memory and never stored.
     </p>
   </footer>
-  
-  <script>
-    const input = document.getElementById("chatFile");
-    const name = document.getElementById("fileName");
-    const btn = document.getElementById("convertBtn");
 
-    input.addEventListener("change", () => {
-      name.textContent = input.files?.[0]?.name || "Choose .txt file";
-    });
-
-    document.getElementById("uploadForm").addEventListener("submit", () => {
-      btn.disabled = true;
-      btn.textContent = "Converting…";
-    });
-  </script>
-
+  <!-- Frontend JS -->
+  <script src="/main.js"></script>
 </body>
 </html>
