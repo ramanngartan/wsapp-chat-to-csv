@@ -555,7 +555,18 @@ app.get("/download/:id", async (req, res) => {
   }
 
   const format = req.query.format || "csv";
-  const filters = req.query.filters ? JSON.parse(req.query.filters) : {};
+  
+  // Safely parse filters
+  let filters = {};
+  if (req.query.filters) {
+    try {
+      filters = JSON.parse(req.query.filters);
+    } catch (e) {
+      console.error("Error parsing filters:", e);
+      filters = {};
+    }
+  }
+  
   const columns = req.query.columns ? req.query.columns.split(",") : ["date", "time", "sender", "message"];
   const delimiter = req.query.delimiter || ",";
   
@@ -577,7 +588,10 @@ app.get("/download/:id", async (req, res) => {
         const buffer = await toExcel(filtered, columns);
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="${baseName}.xlsx"`);
-        return res.send(buffer);
+        res.send(buffer);
+        // Delete session after successful send
+        setTimeout(() => downloads.delete(req.params.id), 100);
+        return;
       
       case "html":
         content = toHtml(filtered, columns);
@@ -593,14 +607,18 @@ app.get("/download/:id", async (req, res) => {
         break;
     }
 
-    downloads.delete(req.params.id);
-
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(content);
+    
+    // Delete session after successful send
+    setTimeout(() => downloads.delete(req.params.id), 100);
   } catch (err) {
     console.error("Export error:", err);
-    res.status(500).json({ error: "Error generating export: " + err.message });
+    // Don't delete session on error so user can try again
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Error generating export: " + err.message });
+    }
   }
 });
 
