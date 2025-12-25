@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WhatsApp Chat to CSV</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>WhatsApp Chat to CSV</h1>
+    <p class="sub">
+      Upload a WhatsApp exported <b>.txt</b> file and download a clean <b>.csv</b>.
+    </p>
+
+    <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data">
+      <label class="file">
+        <input id="chatFile" type="file" name="chatFile" accept=".txt" required />
+        <span id="fileName">Choose .txt file</span>
+      </label>
+
+      <button id="convertBtn" type="submit">Convert</button>
+
+      <p class="note">
+        Privacy: files are processed in memory and not stored.
+      </p>
+    </form>
+
+    <details class="how">
+      <summary>How to export WhatsApp chat</summary>
+      <ol>
+        <li>Open chat → menu → <b>More</b> → <b>Export chat</b></li>
+        <li>Choose <b>Without media</b></li>
+        <li>Save the exported <b>.txt</b> file, then upload here</li>
+      </ol>
+    </details>
+  </main>
+
+  <script>
+    const input = document.getElementById("chatFile");
+    const name = document.getElementById("fileName");
+    const btn = document.getElementById("convertBtn");
+
+    input.addEventListener("change", () => {
+      name.textContent = input.files?.[0]?.name || "Choose .txt file";
+    });
+
+    document.getElementById("uploadForm").addEventListener("submit", () => {
+      btn.disabled = true;
+      btn.textContent = "Converting…";
+    });
+  </script>
+</body>
+</html>
